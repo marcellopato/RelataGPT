@@ -2,6 +2,12 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+use App\Http\Controllers\ChatController;
+
+Route::get('/', [ChatController::class, 'index'])->name('home');
+Route::post('/ask', [ChatController::class, 'ask'])->name('ask');
+
+
+//Route::get('/', function () {
+//    return view('welcome');
+//});
