@@ -21,18 +21,17 @@ class ChatController extends Controller
         $question = $request->input('question');
 
         try {
-            // Requisição para a API do OpenAI usando o modelo gpt-3.5-turbo
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
             ])->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-3.5-turbo',  // Ou 'gpt-4', se estiver habilitado
+                'model' => 'gpt-3.5-turbo',
                 'messages' => [
                     [
-                        'role' => 'system', // Define o comportamento do ChatGPT
-                        'content' => 'Você é um assistente útil que analisa a relação entre pessoas baseadas em emails.'
+                        'role' => 'system',
+                        'content' => 'You are a helpful assistant that analyzes the relationships between people based on their emails.'
                     ],
                     [
-                        'role' => 'user', // Mensagem do usuário
+                        'role' => 'user',
                         'content' => $question
                     ]
                 ],
@@ -41,15 +40,14 @@ class ChatController extends Controller
 
             $responseBody = $response->json();
 
-            // Verifique se a chave 'choices' existe e se contém o texto da resposta
-            if (isset($responseBody['choices']) && isset($responseBody['choices'][0]['message']['content'])) {
+            if (isset($responseBody['choices'][0]['message']['content'])) {
                 $chatResponse = $responseBody['choices'][0]['message']['content'];
             } else {
-                $chatResponse = 'Desculpe, não foi possível obter uma resposta no momento.';
+                $chatResponse = 'Sorry, I was unable to get an answer at the moment.';
             }
 
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Erro ao conectar-se à API do ChatGPT: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => 'Error connecting to ChatGPT API: ' . $e->getMessage()]);
         }
 
         return view('chat', ['question' => $question, 'chatResponse' => $chatResponse]);
