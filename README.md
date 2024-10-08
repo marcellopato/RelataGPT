@@ -153,4 +153,3 @@ Here are some common issues and their solutions:
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 ```
 
-Just copy and paste this into your local `README.md` file in the project directory. Let me know if anything else is needed!
