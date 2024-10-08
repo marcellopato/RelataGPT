@@ -33,7 +33,7 @@
 
     @if(isset($chatResponse))
         <div class="mt-5">
-            <h4>ChatGPT response:</h4>
+            <h4>ChatGPT's response:</h4>
             <p>{{ $chatResponse }}</p>
         </div>
     @endif
