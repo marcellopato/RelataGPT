@@ -8,35 +8,86 @@
 </head>
 <body>
 <div class="container mt-5">
-    @if($errors->any())
-        <div class="alert alert-danger mt-3">
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
-    <h1>RelataGPT</h1>
-    <p>Ask about Abu Nayem and Aftab Girach:</p>
-
-    <!-- Question form -->
-    <form action="{{ route('ask') }}" method="POST">
+    <h2>Ask ChatGPT</h2>
+    <form id="chat-form">
         @csrf
-        <div class="mb-3">
-            <label for="question" class="form-label">Your question</label>
-            <input type="text" class="form-control" id="question" name="question" required placeholder="Type your question...">
+        <div class="form-group">
+            <label for="question">Your Question</label>
+            <input type="text" class="form-control" id="question" name="question" placeholder="Ask a question..." required>
         </div>
-        <button type="submit" class="btn btn-primary">Send</button>
+        <button type="submit" id="send-button" class="btn btn-primary mt-3">
+            Send
+            <span id="loading-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none;"></span>
+        </button>
     </form>
 
-    @if(isset($chatResponse))
-        <div class="mt-5">
-            <h4>ChatGPT's response:</h4>
-            <p>{{ $chatResponse }}</p>
-        </div>
-    @endif
+    <!-- Local para exibir a resposta -->
+    <div id="chat-response" class="alert alert-info mt-3" style="display:none;"></div>
 </div>
+
+<!-- jQuery para lidar com a requisição -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+    $(document).ready($(document).ready(function() {
+        $('#chat-form').on('submit', function(e) {
+            e.preventDefault();
+
+            // Mostrar o spinner de carregamento
+            $('#loading-spinner').show();
+            $('#send-button').prop('disabled', true);
+            $('#chat-response').hide();
+
+            // Enviar a requisição AJAX
+            $.ajax({
+                url: '{{ route("ask") }}',
+                method: 'POST',
+                data: $(this).serialize(),
+                success: function(response) {
+                    if (response.status === 'processing') {
+                        // Iniciar polling para verificar se a resposta foi processada
+                        pollForResponse(response.chatResponseId);
+                    }
+                },
+                error: function() {
+                    $('#loading-spinner').hide();
+                    $('#send-button').prop('disabled', false);
+                    $('#chat-response').text('An error occurred. Please try again.').show();
+                }
+            });
+        });
+
+        // Função para fazer polling até que a resposta esteja disponível
+        function pollForResponse(chatResponseId) {
+            var interval = setInterval(function() {
+                $.ajax({
+                    url: '/chat-response/' + chatResponseId, // Criar essa rota para buscar a resposta
+                    method: 'GET',
+                    success: function(response) {
+                        if (response.is_processed) {
+                            // Parar o polling quando a resposta estiver pronta
+                            clearInterval(interval);
+
+                            // Esconder o spinner
+                            $('#loading-spinner').hide();
+                            $('#send-button').prop('disabled', false);
+
+                            // Exibir a resposta
+                            $('#chat-response').text(response.response).show();
+                        }
+                    },
+                    error: function() {
+                        clearInterval(interval);
+                        $('#loading-spinner').hide();
+                        $('#send-button').prop('disabled', false);
+                        $('#chat-response').text('Error fetching response.').show();
+                    }
+                });
+            }, 3000); // Poll a cada 3 segundos
+        }
+    }));
+
+</script>
+
 </body>
 </html>
