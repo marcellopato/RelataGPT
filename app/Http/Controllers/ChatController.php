@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Email;
 use Illuminate\Http\Request;
-use App\Jobs\ProcessChatRequest;
-use App\Models\ChatResponse;
+use Illuminate\Support\Facades\Http;
+use App\Jobs\ProcessEmailsChunkJob;
 
 class ChatController extends Controller
 {
@@ -13,41 +14,93 @@ class ChatController extends Controller
         return view('chat');
     }
 
+    // Step 1: Handle file import
+    // Step 1: Handle file import
+    public function import(Request $request)
+    {
+        // Validate the uploaded file
+        $request->validate([
+            'json_file' => 'required|file|mimes:json'
+        ]);
+
+        // Read the uploaded JSON file
+        $jsonFile = $request->file('json_file');
+        $jsonData = json_decode(file_get_contents($jsonFile->getRealPath()), true);
+
+        if (!is_null($jsonData)) {
+            // Process JSON data in chunks
+            $chunkSize = 500; // Set the chunk size (e.g., 500 emails per chunk)
+            $chunks = array_chunk($jsonData, $chunkSize);
+
+            foreach ($chunks as $chunk) {
+                // Dispatch each chunk to a background job for processing
+                ProcessEmailsChunkJob::dispatch($chunk);
+            }
+        }
+
+        return response()->json(['message' => 'File is being processed.']);
+    }
+
+
+    // Step 2: Handle the question form
     public function ask(Request $request)
     {
+        // Validate the question
         $request->validate([
-            'question' => 'required|string',
+            'question' => 'required|string'
         ]);
 
         $question = $request->input('question');
 
-        // Create a new response record
-        $chatResponse = ChatResponse::create([
-            'question' => $question,
-        ]);
+        // Fetch relevant emails from the database
+        $emails = Email::where(function ($query) {
+            $query->where('from_email', 'like', '%naeem043@gmail.com%')
+                ->orWhere('from_email', 'like', '%aftabgirach@gmail.com%');
+        })->where(function ($query) {
+            $query->where('to_email', 'like', '%naeem043@gmail.com%')
+                ->orWhere('to_email', 'like', '%aftabgirach@gmail.com%');
+        })->get();
 
-        // Dispatch the job to process the question in the background
-        ProcessChatRequest::dispatch($chatResponse->id);
+        // Format email content for ChatGPT prompt
+        $emailContent = $emails->map(function ($email) {
+            return "Subject: {$email->subject}\nFrom: {$email->from_email}\nTo: {$email->to_email}\nContent: {$email->body_text}\n\n";
+        })->implode("\n---\n");
 
-        // Return the ID of the chatResponse for the frontend to make the polling
-        return response()->json([
-            'status' => 'processing',
-            'chatResponseId' => $chatResponse->id,
-            'message' => 'Your request is being processed.'
-        ]);
-    }
+        $completePrompt = "Here are the emails exchanged between Abu Nayem and Aftab Girach:\n\n" . $emailContent . "\n\nBased on these emails, " . $question;
 
-    public function getChatResponse($id)
-    {
-        $chatResponse = ChatResponse::find($id);
+        try {
+            // Send request to OpenAI API
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
+            ])->post('https://api.openai.com/v1/chat/completions', [
+                'model' => 'gpt-3.5-turbo',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'You are a helpful assistant that analyzes emails to determine relationships and provide context.'
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => $completePrompt
+                    ]
+                ],
+                'max_tokens' => 500,
+            ]);
 
-        if (!$chatResponse) {
-            return response()->json(['error' => 'Chat response not found'], 404);
+            $responseBody = $response->json();
+
+            // Check if a valid response from ChatGPT is received
+            if (isset($responseBody['choices'][0]['message']['content'])) {
+                $chatResponse = $responseBody['choices'][0]['message']['content'];
+            } else {
+                $chatResponse = 'Sorry, I could not retrieve a response at this moment.';
+            }
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error connecting to the ChatGPT API: ' . $e->getMessage()], 500);
         }
 
-        return response()->json([
-            'response' => $chatResponse->response,
-            'is_processed' => $chatResponse->is_processed,
-        ]);
+        return response()->json(['response' => $chatResponse]);
     }
+
 }
