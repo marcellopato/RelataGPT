@@ -3,10 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use App\Models\Email;
 use App\Jobs\ProcessChatRequest;
-use Illuminate\Support\Facades\Cache;
 use App\Models\ChatResponse;
 
 class ChatController extends Controller
@@ -24,15 +21,15 @@ class ChatController extends Controller
 
         $question = $request->input('question');
 
-        // Criar um novo registro de resposta
+        // Create a new response record
         $chatResponse = ChatResponse::create([
             'question' => $question,
         ]);
 
-        // Despachar o job para processar a pergunta em segundo plano
+        // Dispatch the job to process the question in the background
         ProcessChatRequest::dispatch($chatResponse->id);
 
-        // Retornar o ID do chatResponse para o frontend fazer o polling
+        // Return the ID of the chatResponse for the frontend to make the polling
         return response()->json([
             'status' => 'processing',
             'chatResponseId' => $chatResponse->id,

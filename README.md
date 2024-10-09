@@ -83,6 +83,11 @@ Follow these steps to set up and run the application:
    ./vendor/bin/sail artisan migrate
    ```
 
+    Import emails JSON file from public folder (public/order_id_50782.json)
+    ```bash
+    ./vendor/bin/sail artisan import:emails public/order_id_50782.json
+    ```
+
 8. **Seed the Database (Optional):**
 
    If you need to insert test data (like emails), you can run the seeder:
